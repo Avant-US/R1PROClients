@@ -1,0 +1,82 @@
+[robot]
+hardware = "R1_PRO"
+
+# comment out keys you don't want to publish
+# enable_publish = []
+enable_publish = ["left_arm", "right_arm", "left_gripper", "right_gripper",
+#"torso",  # rldx-1 模型会输出 chassis_pose -> 映射为 torso，需要发布出去
+ "chassis"]
+
+
+[basic]
+use_ehi = false
+control_frequency = 15.0
+step_mode = "async" # Optional["sync", "async"]
+action_steps = 16
+
+[model]
+ckpt_dir = "/home/user/bench_ws/model_res/bench_r1pro_g0tiny_gift"
+processor = "rldx1" # Optional["default", "cuda", "openpi", "rldx1"]
+use_trt = false
+is_torch_compile = false
+
+[trajectory]
+ensemble_mode = "HATO"
+execution_mode = "JOINT_STATE"
+tau_hato = 0.3
+
+
+[websocket]
+use_websocket = true
+host = "34.6.175.178"
+port = 8000
+
+[openpi]
+default_prompt = "Open the door with a downward-press handle, go through it, and enter the room."
+image_target_size = 224  # match server ResizeImages(224,224), 0 = send original
+chassis_deadzone = 0.01  # zero out chassis velocity below this threshold, 0 = no filter
+
+# Center-crop images to match training data aspect ratios before resize_with_pad.
+# Format: [width, height]. Comment out to disable (use native aspect ratio).
+[openpi.crop_aspect]
+head = [16, 9]   # old machine head camera was 640x360 (16:9)
+wrist = [4, 3]   # old machine wrist camera was 640x480 (4:3)
+
+# Client-side resize before sending over websocket.
+# Format: [H, W]. Comment out this section to send native camera resolution.
+[openpi.image_target_hw]
+head_rgb = [320, 192]
+left_wrist_rgb = [256, 192]
+right_wrist_rgb = [256, 192]
+
+[instruction]
+use_vlm = false
+bbox_as_instruction = false
+image_condition_lang_prefix = false
+pp_lower_half = false
+image_as_condition = false
+
+# rldx-1 协议（4 帧视频 + 分部位 state + dict-action）
+[rldx1]
+default_prompt = "Open the door with a downward-press handle, go through it, and enter the room."
+# 视频历史帧偏移，0 = 当前帧；不够长时 clamp 到 buffer[0]。
+# 当前 ckpt 训练时的 delta_indices = [-6, -4, -2, 0]，按控制步计。
+delta_indices = [-6, -4, -2, 0]
+chassis_deadzone = 0.01
+
+# 客户端把每路相机做 center-crop（按 aspect）+ bilinear resize 到 [H, W]
+[rldx1.image_target_hw]
+head_rgb = [224, 224]
+left_wrist_rgb = [224, 224]
+right_wrist_rgb = [224, 224]
+
+# 服务端返回 action dict 的 key  →  本机发布通道的 part key 映射。
+# 改成 rldx-1 特有命名时只改这里即可，无需碰 publishing 代码。
+# 默认值：chassis_pose 实际就是 torso；chassis_velocity 是底盘速度。
+[rldx1.action_key_map]
+left_arm = "left_arm"
+right_arm = "right_arm"
+left_gripper = "left_gripper"
+right_gripper = "right_gripper"
+chassis_pose = "torso"
+chassis_velocity = "chassis"
