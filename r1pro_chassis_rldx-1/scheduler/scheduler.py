@@ -364,9 +364,26 @@ class Scheduler:
     def _setup_instruction_manager(self):
         self.instruction_manager = InstructionManager(self.schedule_config["instruction"])
 
+    def _compute_video_history_indices(self):
+        """如果 processor 暴露 delta_indices（按视频帧 index 偏移），就分发给三路相机，
+        让 ros2_bridge.gather_obs 在相机 buffer 上按 index 取多帧，和训练时一致。
+        """
+        delta_indices = getattr(self.processor, "delta_indices", None)
+        if not delta_indices:
+            return None
+        cameras = ("head_rgb", "left_wrist_rgb", "right_wrist_rgb")
+        logger.info(f"video_history_indices forwarded to bridge: {list(delta_indices)}")
+        return {name: list(delta_indices) for name in cameras}
+
     def _setup_ros2_bridge(self):
         # HACK: use_recv_time=True to use the received time from ROS2 messages
-        self.ros2_bridge = Ros2Bridge(self.schedule_config, self.model_config, use_recv_time=True)
+        video_history_indices = self._compute_video_history_indices()
+        self.ros2_bridge = Ros2Bridge(
+            self.schedule_config,
+            self.model_config,
+            use_recv_time=True,
+            video_history_indices=video_history_indices,
+        )
         self.ros2_bridge.register_subscription(String, 'hs/vlm_out2vla', self.instruction_manager._ehi_instruction_callback)
         
         if self.step_mode == "async":

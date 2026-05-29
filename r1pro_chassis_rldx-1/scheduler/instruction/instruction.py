@@ -4,6 +4,7 @@ from enum import Enum
 from std_msgs.msg import String
 
 from utils.message.message_convert import decode_img_from_base64
+import numpy as np
 import torch
 from loguru import logger
 
@@ -87,12 +88,28 @@ class InstructionManager:
     def _get_instruction_from_file(self):
         return self.text_instruction_file.read_text().replace('\n','')
 
+    @staticmethod
+    def _tensor_to_hwc_numpy(img: torch.Tensor) -> np.ndarray:
+        """(1,C,H,W) or (C,H,W) or (1,H,W,C) / (H,W,C) → (H,W,C) uint8/float numpy."""
+        t = img.detach().cpu()
+        while t.ndim > 3 and t.shape[0] == 1:
+            t = t.squeeze(0)
+        if t.ndim == 3 and t.shape[0] in (1, 3):
+            t = t.permute(1, 2, 0)
+        elif t.ndim != 3 or t.shape[-1] not in (1, 3, 4):
+            raise ValueError(
+                f"Expected image tensor (1,C,H,W) or (H,W,C), got shape {tuple(img.shape)}"
+            )
+        return t.numpy()
+
     def _get_extra_info(self, instruction: str, head_rgb: torch.Tensor):
         extra_info = {}
-        head_rgb = head_rgb.squeeze(0).cpu().numpy().transpose(1, 2, 0)
-        if self.pp_lower_half:
-            img_height = head_rgb.shape[0]
-            head_rgb = head_rgb[img_height//2:, :, :]
+        need_image = self.image_as_condition or self.bbox_as_instruction or self.pp_lower_half
+        if need_image:
+            head_rgb = self._tensor_to_hwc_numpy(head_rgb)
+            if self.pp_lower_half:
+                img_height = head_rgb.shape[0]
+                head_rgb = head_rgb[img_height // 2 :, :, :]
         if self.image_as_condition:
             call_gemini_for_bbox, get_bbox_image, _ = _load_bbox_utils()
             bbox = call_gemini_for_bbox(head_rgb, instruction)

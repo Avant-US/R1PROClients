@@ -62,6 +62,9 @@ class RobotTopicsConfig:
         }
     )
 
-    camera_deque_length: int = 3 # 15Hz, for 0.2s
-    state_deque_length: int = 80 # >400 Hz, for 0.2s
-
+    # 为了让 gather_obs 能按 buffer 索引回溯历史视频帧（rldx1 等多帧模型按
+    # 视频帧 index 取 delta_indices=[-6,-4,-2,0]，和训练采集时一致），
+    # 默认保留 30 帧。按相机 30Hz 算 ~1s，15Hz 算 ~2s 历史。
+    # 单帧 raw RGB ~2-3MB，三路 30 帧约 240MB 内存。
+    camera_deque_length: int = 30
+    state_deque_length: int = 80  # >400 Hz, for 0.2s

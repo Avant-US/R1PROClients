@@ -78,6 +78,7 @@ class RLDX1Processor(Processor):
         self.action_key_map: Dict[str, str] = {**_DEFAULT_ACTION_KEY_MAP, **dict(key_map_cfg)}
         logger.info(f"rldx1 action_key_map = {self.action_key_map}")
 
+        # ---- 单帧 fallback 时维护的历史 deque（当 ros2_bridge 没启用多帧路径时使用） ----
         self._video_history: Dict[str, deque] = {
             "head_rgb": deque(maxlen=self.history_len),
             "left_wrist_rgb": deque(maxlen=self.history_len),
@@ -124,16 +125,32 @@ class RLDX1Processor(Processor):
         resized = F.interpolate(nchw, size=(target_h, target_w), mode="bilinear", align_corners=False)
         return resized.squeeze(0).permute(1, 2, 0).to(img.dtype).contiguous()
 
-    def _process_camera(self, name: str, img: torch.Tensor) -> np.ndarray:
-        """把当前帧加入历史 buffer，再按 delta_indices 抽 4 帧，返回 (T, H, W, 3) uint8。
-
-        历史不够时（任务刚开始），按 eval 脚本的做法 clamp 到 buffer[0]。
-        """
-        hwc = self._to_hwc(img)
+    def _resize_one_frame(self, name: str, frame_chw_or_1chw: torch.Tensor) -> torch.Tensor:
+        """单帧 (C,H,W) 或 (1,C,H,W) → HWC uint8 cpu tensor，按 image_target_hw 裁剪 + resize。"""
+        hwc = self._to_hwc(frame_chw_or_1chw)
         if (hw := self.image_target_hw[name]) is not None:
             hwc = self._center_crop_resize(hwc, *hw)
-        hwc = hwc.to(torch.uint8).cpu()
+        return hwc.to(torch.uint8).cpu()
 
+    def _process_camera(self, name: str, img: torch.Tensor) -> np.ndarray:
+        """返回 (T, H, W, 3) uint8，T == len(delta_indices)。
+
+        支持两种输入形式：
+          1) 多帧路径 (T, C, H, W)：由 ros2_bridge 按 delta_indices 在 buffer 上
+             直接按 index 抽好的历史，已经按 delta_indices 顺序排好。直接逐帧 resize。
+          2) 单帧路径 (1, C, H, W) 或 (C, H, W)：fallback，使用内部 _video_history deque
+             按调用次数累积历史；冷启动不够时 clamp 到 buf[0]（保留原行为）。
+        """
+        n_out = len(self.delta_indices)
+
+        if img.ndim == 4 and img.shape[0] == n_out and n_out > 1:
+            frames_out: List[torch.Tensor] = [
+                self._resize_one_frame(name, img[t]) for t in range(n_out)
+            ]
+            return torch.stack(frames_out, dim=0).numpy()
+
+        # ---- 单帧 fallback：维护内部 deque ----
+        hwc = self._resize_one_frame(name, img)
         buf = self._video_history[name]
         buf.append(hwc)
 
@@ -145,8 +162,7 @@ class RLDX1Processor(Processor):
             if idx < 0:
                 idx = 0  # clamp 到当前 buffer 里最旧的一帧
             frames.append(buf[idx])
-        stacked = torch.stack(frames, dim=0).numpy()
-        return stacked  # (T, H, W, 3) uint8
+        return torch.stack(frames, dim=0).numpy()
 
     @staticmethod
     def _state_to_2d(value: Any, expected_dim: int, name: str) -> np.ndarray:

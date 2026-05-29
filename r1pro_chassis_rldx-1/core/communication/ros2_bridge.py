@@ -11,6 +11,7 @@ import numpy as np
 import time
 import threading
 from dataclasses import asdict
+from typing import Dict, List, Optional
 
 from core.communication.robot_topics import RobotTopicsConfig
 from core.communication.message_queue import MessageQueue
@@ -24,13 +25,36 @@ from utils.message.message_convert import (
 from utils.message.datatype import RobotAction
 
 class Ros2Bridge:
-    def __init__(self, config, cfg, use_recv_time: bool = False, num_threads: int = None):
+    def __init__(
+        self,
+        config,
+        cfg,
+        use_recv_time: bool = False,
+        num_threads: int = None,
+        video_history_indices: Optional[Dict[str, List[int]]] = None,
+    ):
+        """
+        Args:
+            video_history_indices: 可选。形如 {"head_rgb": [-6, -4, -2, 0], ...}，
+                每个相机要返回的多帧索引偏移（<= 0，0 表示 buffer 最新一帧；
+                与训练时按视频帧 index 抽帧的方式一致）。
+                配置后，gather_obs 会对该相机按这些索引偏移从 buffer 取帧，
+                返回形状为 (T, C, H, W) 的多帧 tensor。
+                buffer 不够旧时 clamp 到 buffer[0]。
+                未配置的相机仍走原单帧 (1, C, H, W) 路径。
+        """
         self.topics_config = RobotTopicsConfig()
         self.use_recv_time = use_recv_time
         self.cfg = cfg
         self.hardware = config["robot"]["hardware"]
         self.enable_publish = config["robot"]["enable_publish"]
         self.action_steps = config["basic"]["action_steps"]
+        self.video_history_indices: Dict[str, List[int]] = (
+            {k: [int(i) for i in v] for k, v in video_history_indices.items()}
+            if video_history_indices else {}
+        )
+        if self.video_history_indices:
+            logger.info(f"video_history_indices (<=0, buffer-relative): {self.video_history_indices}")
         logger.info(f"config.toml:\nhardware:{self.hardware}\nenable publish: {self.enable_publish}")
         
         if not rclpy.ok():
@@ -165,7 +189,49 @@ class Ros2Bridge:
                     break
         
         return best_msg
-    
+
+    def _msg_data_to_tensor(self, data) -> torch.Tensor:
+        """把 buffer 里存的原始 data 转成 torch.Tensor，单帧图像会被 unsqueeze 到 (1, C, H, W)。"""
+        if isinstance(data, torch.Tensor):
+            return data
+        if hasattr(data, "__array__"):
+            return torch.from_numpy(data).unsqueeze(0)
+        return torch.tensor(data)
+
+    def _gather_image_frames(
+        self,
+        name: str,
+        buffer,
+    ) -> Optional[torch.Tensor]:
+        """按 video_history_indices[name] 直接在 buffer 上按 index 取多帧，返回 (T, C, H, W)。
+
+        和训练时按视频帧 index 抽帧（delta_indices=[-6,-4,-2,0]）的方式一致。
+        buffer 不够旧时 clamp 到 buffer[0]（首批帧未填满时退化为重复最旧帧）。
+        """
+        indices = self.video_history_indices.get(name)
+        if not indices:
+            return None
+        n = len(buffer)
+        if n == 0:
+            return None
+
+        frames: List[torch.Tensor] = []
+        for delta in indices:
+            # delta <= 0; 0 = 最新帧
+            idx = n - 1 + delta
+            if idx < 0:
+                idx = 0
+            msg = buffer[idx]
+            frame = msg["data"]
+            if isinstance(frame, torch.Tensor):
+                t = frame
+            elif hasattr(frame, "__array__"):
+                t = torch.from_numpy(frame)  # 多帧路径不再 unsqueeze
+            else:
+                t = torch.tensor(frame)
+            frames.append(t)
+        return torch.stack(frames, dim=0)  # (T, C, H, W)
+
     def gather_obs(self, device: torch.device = torch.device("cuda")):
         head_rgb_key = "head_rgb"
         if head_rgb_key not in self.obs_buffer or len(self.obs_buffer[head_rgb_key]) == 0:
@@ -186,23 +252,31 @@ class Ros2Bridge:
             if len(buffer) == 0:
                 logger.warning(f"Buffer {name} is empty, skipping")
                 return None, None
-            
-            if name == head_rgb_key:
-                data = head_msg["data"]
+
+            if name in self.topics_config.images:
+                # ---- 图像分支 ----
+                multi = self._gather_image_frames(name, buffer)
+                if multi is not None:
+                    # 多帧路径：(T, C, H, W)
+                    obs["images"][name] = multi.to(device)
+                else:
+                    # 单帧路径（原行为，向后兼容）
+                    if name == head_rgb_key:
+                        data = head_msg["data"]
+                    else:
+                        nearest_msg = self._find_nearest_message(buffer, reference_time)
+                        if nearest_msg is None:
+                            logger.warning(f"Failed to find nearest message for {name}")
+                            return None, None
+                        data = nearest_msg["data"]
+                    obs["images"][name] = self._msg_data_to_tensor(data).to(device)
             else:
+                # ---- 状态分支 ----
                 nearest_msg = self._find_nearest_message(buffer, reference_time)
                 if nearest_msg is None:
                     logger.warning(f"Failed to find nearest message for {name}")
                     return None, None
-                data = nearest_msg["data"]
-            
-            if not isinstance(data, torch.Tensor):
-                data = torch.from_numpy(data).unsqueeze(0) if hasattr(data, '__array__') else torch.tensor(data)
-            
-            if name in self.topics_config.images:
-                obs["images"][name] = data.to(device)#.unsqueeze(0)
-            else:
-                obs["state"][name] = data.float()
+                obs["state"][name] = self._msg_data_to_tensor(nearest_msg["data"]).float()
 
         obs["state_is_pad"] = torch.tensor([False])
         obs["image_is_pad"] = torch.tensor([False])
@@ -299,4 +373,3 @@ class Ros2Bridge:
             data=pose_to_7d_array(msg.pose))
     
         _stack.append(data_dict)
-

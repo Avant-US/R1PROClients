@@ -80,6 +80,8 @@ curl http://localhost:8088/health
 
 ```bash
 curl http://localhost:8088/status
+
+curl http://localhost:8099/status
 ```
 
 **响应**
@@ -112,6 +114,14 @@ curl http://localhost:8088/status
 
 ```bash
 curl -X POST http://localhost:8088/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instruction": "Open the door with a downward-press handle, go through it, and enter the room.",
+    "timeout": 140,
+    "poll_interval": 2
+  }'
+
+curl -X POST http://localhost:8099/start \
   -H "Content-Type: application/json" \
   -d '{
     "instruction": "Open the door with a downward-press handle, go through it, and enter the room.",
@@ -204,6 +214,8 @@ curl -X POST http://localhost:8088/execute \
 
 ```bash
 curl -X POST http://localhost:8088/stop
+
+curl -X POST http://localhost:8099/stop
 ```
 
 **响应**

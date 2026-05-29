@@ -1,21 +1,10 @@
-"""
-VLA Door Client：通过 HTTP 接口控制机器人开门任务。
-
-启动:
-    uvicorn vla_door_client:app --host 0.0.0.0 --port 8080
-
-或:
-    .venv/bin/python vla_door_client.py            # 默认 0.0.0.0:8088
-    .venv/bin/python vla_door_client.py --port 9090
-"""
-
 import os
 import signal
-import subprocess
 import sys
-import json
+import subprocess
 import threading
 import time
+import json
 import urllib.request
 from contextlib import asynccontextmanager
 from enum import Enum
@@ -29,28 +18,19 @@ import uvicorn
 # ─── 配置 ────────────────────────────────────────────────────────────
 
 EFMNODE_URL = "http://localhost:9001"
-PROJECT_DIR = "/home/nvidia/lg_ws/Rb/R1PROClients/r1pro_chassis_rldx-1" #os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _ROS2_ENV = os.environ.copy()
-_ROS2_ENV.setdefault("PATH", "/opt/ros/humble/bin:" + os.environ.get("PATH", ""))
-_ROS2_ENV.setdefault(
-    "PYTHONPATH",
-    "/opt/ros/humble/lib/python3.10/site-packages:"
-    "/opt/ros/humble/local/lib/python3.10/dist-packages",
-)
-_ROS2_ENV.setdefault(
-    "LD_LIBRARY_PATH",
-    "/opt/ros/humble/opt/rviz_ogre_vendor/lib:"
-    "/opt/ros/humble/lib/aarch64-linux-gnu:"
-    "/opt/ros/humble/lib:"
-    "/usr/local/cuda-12.2/lib64:/usr/local/lib",
-)
-_ROS2_ENV.setdefault("AMENT_PREFIX_PATH", "/opt/ros/humble")
-_ROS2_ENV.setdefault("ROS_DISTRO", "humble")
-_ROS2_ENV.setdefault("ROS_VERSION", "2")
-_ROS2_ENV.setdefault("ROS_PYTHON_VERSION", "3")
-_ROS2_ENV.setdefault("ROS_DOMAIN_ID", "80")
-_ROS2_ENV.setdefault("ROS_LOCALHOST_ONLY", "0")
+_ROS2_ENV.update({
+    "ROS_DISTRO": "humble",
+    "ROS_VERSION": "2",
+    "ROS_PYTHON_VERSION": "3",
+    "ROS_DOMAIN_ID": os.environ.get("ROS_DOMAIN_ID", "0"),
+    # 不要硬编码 ROS_LOCALHOST_ONLY!
+    # 本机相机发布者 (signal_camera/HDAS) 启动时用的 =1,
+    # 如果这里强行设 =0, FastDDS SHM segment 配置不匹配, 收不到任何数据
+    "ROS_LOCALHOST_ONLY": os.environ.get("ROS_LOCALHOST_ONLY", "1"),
+})
 
 # --wait-matching-subscriptions 0: 不等订阅者出现，发完就走
 # 旧机器有 relaxed_ik 等节点订阅; 新机器只有 chassis 自己订阅, 关掉后没人收, 默认会卡 10s 超时
@@ -184,7 +164,7 @@ def _ensure_run_py() -> bool:
         return True
 
     print("[client] run.py 未运行，正在启动...")
-    cmd = ["/home/nvidia/zwy_WS/r1pro_chassis_rldx-1/venv/bin/python", "run.py"]
+    cmd = [sys.executable, "run.py"]
     _state.run_py_proc = subprocess.Popen(
         cmd,
         cwd=PROJECT_DIR,
@@ -214,7 +194,7 @@ def _kill_run_py():
         print("[client] run.py 已关闭")
 
     subprocess.run(
-        "pkill -9 -f '/home/nvidia/zwy_WS/r1pro_chassis_rldx-1/venv/bin/python run.py'",
+        f"pkill -9 -f '{sys.executable} run.py'",
         shell=True, timeout=5, env=_ROS2_ENV,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
@@ -426,6 +406,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8099)
+    parser.add_argument("--port", type=int, default=8088)
     args = parser.parse_args()
     uvicorn.run(app, host=args.host, port=args.port)

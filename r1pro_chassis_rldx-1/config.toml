@@ -10,8 +10,8 @@ enable_publish = ["left_arm", "right_arm", "left_gripper", "right_gripper",
 
 [basic]
 use_ehi = false
-control_frequency = 15.0
-step_mode = "async" # Optional["sync", "async"]
+control_frequency = 10.0
+step_mode = "sync" # Optional["sync", "async"]
 action_steps = 16
 
 [model]
@@ -66,9 +66,9 @@ chassis_deadzone = 0.01
 
 # 客户端把每路相机做 center-crop（按 aspect）+ bilinear resize 到 [H, W]
 [rldx1.image_target_hw]
-head_rgb = [224, 224]
-left_wrist_rgb = [224, 224]
-right_wrist_rgb = [224, 224]
+head_rgb = [320, 192]
+left_wrist_rgb = [256, 192]
+right_wrist_rgb = [256, 192]
 
 # 服务端返回 action dict 的 key  →  本机发布通道的 part key 映射。
 # 改成 rldx-1 特有命名时只改这里即可，无需碰 publishing 代码。
