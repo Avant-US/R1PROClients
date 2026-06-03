@@ -89,17 +89,7 @@ class InstructionManager:
 
     def _get_extra_info(self, instruction: str, head_rgb: torch.Tensor):
         extra_info = {}
-        if not self.image_as_condition and not self.bbox_as_instruction:
-            extra_info["instruction"] = instruction
-            return extra_info
-
-        # rldx-1 passes video history as (T, C, H, W); bbox prompting only needs
-        # a single image, so use the latest frame without changing model input.
-        if head_rgb.ndim == 4 and head_rgb.shape[0] > 1:
-            head_rgb = head_rgb[-1]
-        else:
-            head_rgb = head_rgb.squeeze(0)
-        head_rgb = head_rgb.cpu().numpy().transpose(1, 2, 0)
+        head_rgb = head_rgb.squeeze(0).cpu().numpy().transpose(1, 2, 0)
         if self.pp_lower_half:
             img_height = head_rgb.shape[0]
             head_rgb = head_rgb[img_height//2:, :, :]
@@ -118,6 +108,8 @@ class InstructionManager:
             bbox = call_gemini_for_bbox(head_rgb, instruction)
             paligemma_instrctuion = get_paligemma_box_instruction(head_rgb, bbox)
             extra_info["instruction"] = paligemma_instrctuion
+        else:
+            extra_info["instruction"] = instruction
         return extra_info
 
     def _get_extra_info_from_vlm(self, instruction: str, bbox: list[int], head_img_base64: str):

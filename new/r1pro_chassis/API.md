@@ -15,9 +15,6 @@ Agent 只需调用本服务的 HTTP 接口，无需关心底层 `run.py` 和 ROS
 ## 启动方式
 
 ```bash
-cd /home/nvidia/zwy_WS/r1pro_chassis
-source venv/bin/activate
-
 # 默认端口 8088
 python3 vla_door_client.py
 

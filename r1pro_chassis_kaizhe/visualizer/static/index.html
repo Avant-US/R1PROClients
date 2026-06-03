@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>R1 Pro URDF Visualizer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="control-panel">
+        <h1>R1 Pro Visualizer</h1>
+        <p class="subtitle">回放 OpenPI 动作到 R1 Pro URDF</p>
+
+        <section class="panel-block">
+          <div class="status-row">
+            <span>数据源</span>
+            <code id="source-path">loading...</code>
+          </div>
+          <div class="status-row">
+            <span>URDF</span>
+            <code id="urdf-path">loading...</code>
+          </div>
+          <div class="status-row">
+            <span>总帧数</span>
+            <strong id="frame-count">-</strong>
+          </div>
+        </section>
+
+        <section class="panel-block">
+          <div class="button-row">
+            <button id="play-toggle">播放</button>
+            <button id="prev-frame">上一帧</button>
+            <button id="next-frame">下一帧</button>
+            <button id="reset-camera">重置视角</button>
+          </div>
+          <label class="field">
+            <span>当前帧</span>
+            <input id="frame-slider" type="range" min="0" max="0" value="0" />
+          </label>
+          <div class="status-row">
+            <span>帧索引</span>
+            <strong id="frame-label">0 / 0</strong>
+          </div>
+          <label class="field">
+            <span>播放速度 (FPS)</span>
+            <input id="fps-input" type="number" min="1" max="60" step="1" value="15" />
+          </label>
+        </section>
+
+        <section class="panel-block">
+          <h2>夹爪映射</h2>
+          <label class="field">
+            <span>Scale</span>
+            <input id="gripper-scale" type="number" step="0.0001" value="0.0005" />
+          </label>
+          <label class="field">
+            <span>Offset</span>
+            <input id="gripper-offset" type="number" step="0.001" value="0.0" />
+          </label>
+          <p class="hint" id="gripper-hint">opening = clamp((raw * scale) + offset, 0, maxOpening)</p>
+        </section>
+
+        <section class="panel-block">
+          <h2>底盘回放</h2>
+          <label class="field">
+            <span>时间步长 dt</span>
+            <input id="chassis-dt" type="number" step="0.001" value="0.0667" />
+          </label>
+          <label class="field">
+            <span>线速度缩放</span>
+            <input id="chassis-linear-scale" type="number" step="1" value="400" />
+          </label>
+          <label class="field">
+            <span>角速度缩放</span>
+            <input id="chassis-angular-scale" type="number" step="0.1" value="1" />
+          </label>
+          <p class="hint" id="chassis-hint">pose += rotate_body_velocity(vx, vy, yaw) * dt * linearScale; yaw += wz * dt * angularScale</p>
+        </section>
+
+        <section class="panel-block">
+          <h2>当前帧</h2>
+          <pre id="frame-inspector">waiting...</pre>
+        </section>
+      </aside>
+
+      <main class="viewport-shell">
+        <div id="viewport"></div>
+      </main>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "urdf-loader": "https://cdn.jsdelivr.net/npm/urdf-loader@0.12.4/src/URDFLoader.js"
+        }
+      }
+    </script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

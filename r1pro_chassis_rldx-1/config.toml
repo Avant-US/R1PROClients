@@ -11,7 +11,7 @@ enable_publish = ["left_arm", "right_arm", "left_gripper", "right_gripper",
 [basic]
 use_ehi = false
 control_frequency = 10.0
-step_mode = "sync" # Optional["sync", "async"]
+step_mode = "async" # Optional["sync", "async"]
 action_steps = 16
 
 [model]

@@ -1,0 +1,22 @@
+[Unit]
+Description=Door Skill Gateway (vla_door_client, port 8088)
+After=network.target robot-teleop.service
+Wants=robot-teleop.service
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__PROJECT_DIR__
+Environment=HOME=__HOME__
+Environment=USER=__USER__
+Environment=ROS_DOMAIN_ID=80
+ExecStart=/bin/bash -c '. /opt/ros/humble/setup.bash && . /home/__USER__/galaxea/install/setup.bash && source .venv/bin/activate && exec python3 vla_door_client.py'
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
