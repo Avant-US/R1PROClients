@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from loguru import logger
 import torch
-import torch.nn.functional as F
+import torchvision.transforms.functional as TVF
 
 from core.processor.processor import Processor
 
@@ -54,10 +54,19 @@ class OpenPIProcessor(Processor):
 
     @staticmethod
     def _resize_stretch(img: torch.Tensor, target_h: int, target_w: int) -> torch.Tensor:
-        """Resize directly to (target_h, target_w), matching the training pipeline."""
-        nchw = img.permute(2, 0, 1).unsqueeze(0).float()
-        resized = F.interpolate(nchw, size=(target_h, target_w), mode="bilinear", align_corners=False)
-        return resized.squeeze(0).permute(1, 2, 0).to(img.dtype).contiguous()
+        """Resize to (target_h, target_w), matching FastWAM's torchvision.transforms.Resize.
+
+        Uses bilinear interpolation with antialias=True so the result aligns with the
+        cloud-side FastWAM training/inference pipeline. dtype is preserved (uint8 in → uint8 out).
+        """
+        chw = img.permute(2, 0, 1)  # HWC -> CHW
+        resized = TVF.resize(
+            chw,
+            size=[target_h, target_w],
+            interpolation=TVF.InterpolationMode.BILINEAR,
+            antialias=True,
+        )
+        return resized.permute(1, 2, 0).contiguous()  # CHW -> HWC, dtype unchanged
 
     def preprocess(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         images = batch["images"]
@@ -83,6 +92,9 @@ class OpenPIProcessor(Processor):
             raise ValueError(f"Expected 23-dim state, got shape {tuple(state_tensor.shape)}")
 
         head = self._to_hwc(images["head_rgb"])
+        # print("before crop:", head.shape)
+        # head = head[600:, :, :]
+        # print("after crop:", head.shape)
         left = self._to_hwc(images["left_wrist_rgb"])
         right = self._to_hwc(images["right_wrist_rgb"])
 
@@ -107,6 +119,8 @@ class OpenPIProcessor(Processor):
             "left_wrist_rgb": left,
             "right_wrist_rgb": right,
             "state": state_tensor,
+            "ref_time": batch["ref_time"],
+            # "role": "image",
         }
         if prompt:
             obs["prompt"] = prompt

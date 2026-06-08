@@ -1,0 +1,9 @@
+session_name: r1pro_teleop
+start_directory: ${START_DIR}/modules/teleop
+windows:
+- window_name: r1pro_teleop
+  layout: even-horizontal
+  panes:
+  - shell_command:
+      - sleep 5
+      - ./start_r1prot_homogeneous_teleop.sh

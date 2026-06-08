@@ -5,7 +5,7 @@ VLA Door Client：通过 HTTP 接口控制机器人开门任务。
     uvicorn vla_door_client:app --host 0.0.0.0 --port 8080
 
 或:
-    .venv/bin/python vla_door_client.py            # 默认 0.0.0.0:8088
+    .venv/bin/python vla_door_client.py            # 默认 0.0.0.0:8099
     .venv/bin/python vla_door_client.py --port 9090
 """
 
@@ -420,6 +420,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8088)
+    parser.add_argument("--port", type=int, default=8099)
     args = parser.parse_args()
     uvicorn.run(app, host=args.host, port=args.port)

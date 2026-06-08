@@ -15,12 +15,22 @@ from dataclasses import asdict
 from core.communication.robot_topics import RobotTopicsConfig
 from core.communication.message_queue import MessageQueue
 
+import sys
+logger.remove()
+logger.add(sys.stderr, level="DEBUG")
+logger.add(
+    "action_{time:YYYY-MM-DD_HH-mm-ss}.log",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}",
+)
+
 from utils.message.message_convert import (
     header_stamp_to_timestamp,
     pose_to_7d_array,
     compressed_image_to_rgb_array,
     array_to_joint_state
 )
+from utils.message.action_log_format import format_joint_action_23d
 from utils.message.datatype import RobotAction
 
 class Ros2Bridge:
@@ -102,10 +112,17 @@ class Ros2Bridge:
     def is_running(self):
         return rclpy.ok()
 
-    def publish_action(self, action: RobotAction):
-        for name, msg in asdict(action).items():
-            if msg is not None and name in self.enable_publish:
-                self.publishers[self.topics_config.action[name]].publish(msg)
+    def publish_action(self, action: RobotAction, obs_time: float=0.0):
+        action_items = [
+            (name, msg)
+            for name, msg in asdict(action).items()
+            if msg is not None and name in self.enable_publish
+        ]
+        if action_items:
+            logger.debug(">>>> \n 'obs_time'{} , 'ACTIONS':{} \n>>>>>", obs_time, format_joint_action_23d(action))
+
+        for name, msg in action_items:
+            self.publishers[self.topics_config.action[name]].publish(msg)
 
     def reset(self, step_size=0.2, freq = 5):
         # reset to zero joints and close grippers
@@ -208,6 +225,7 @@ class Ros2Bridge:
         obs["image_is_pad"] = torch.tensor([False])
         obs["action_is_pad"] = torch.tensor([False] * self.action_steps)
         obs["idx"] = torch.tensor(0)
+        obs["ref_time"] = reference_time
 
         self.last_obs_time = reference_time
 

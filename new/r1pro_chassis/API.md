@@ -108,7 +108,7 @@ curl http://localhost:8088/status
 **请求**
 
 ```bash
-curl -X POST http://localhost:8088/start \
+curl -X POST http://localhost:8099/start \
   -H "Content-Type: application/json" \
   -d '{
     "instruction": "Open the door with a downward-press handle, go through it, and enter the room.",
@@ -200,7 +200,7 @@ curl -X POST http://localhost:8088/execute \
 **请求**
 
 ```bash
-curl -X POST http://localhost:8088/stop
+curl -X POST http://localhost:8099/stop
 ```
 
 **响应**

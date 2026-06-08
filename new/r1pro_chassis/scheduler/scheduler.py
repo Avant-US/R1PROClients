@@ -283,7 +283,7 @@ class Scheduler:
             if len(trajectory.actions) < self.num_of_steps:
                 raise ValueError(f"Trajectory actions length {len(trajectory.actions)} is less than num_of_steps {self.num_of_steps}")
 
-            self._sync_publish(trajectory)
+            self._sync_publish(trajectory, obs_time)
 
         elif self.step_mode == "async":
             logger.info(f'Add actions to trajectory manager.')
@@ -291,9 +291,9 @@ class Scheduler:
         else:
             raise ValueError(f"Invalid step mode: {self.step_mode}")
 
-    def _sync_publish(self, trajectory: Trajectory):
+    def _sync_publish(self, trajectory: Trajectory, obs_time: float):
         for i in range(self.num_of_steps):
-            self.ros2_bridge.publish_action(trajectory.actions[i])
+            self.ros2_bridge.publish_action(trajectory.actions[i], obs_time)
             time.sleep(1.0 / self.step_freq)
 
     @logger.catch

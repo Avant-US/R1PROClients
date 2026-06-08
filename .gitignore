@@ -221,4 +221,7 @@ venv
 .vscode/
 .vscode
 __pycache__/
-
+.venv
+tmp/
+new/r1pro_chassis/tmp/openpi_processed_actions.txt
+new/r1pro_chassis/tmp/openpi_raw_actions.txt
