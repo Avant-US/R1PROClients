@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlparse
 import xml.etree.ElementTree as ET
 
 
-DEFAULT_URDF_PATH = Path("/home/nvidia/zwy_WS/r1pro_chassis_rldx-1/assets/urdf/r1pro/r1_pro_with_gripper.urdf")
+DEFAULT_URDF_PATH = Path("/home/nvidia/lg_ws/Rb/R1PROClients/r1pro_chassis_rldx-1/assets/urdf/r1pro/r1_pro_with_gripper.urdf")
 DEFAULT_ACTIONS_PATH = Path("./tmp/openpi_processed_actions.txt")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 

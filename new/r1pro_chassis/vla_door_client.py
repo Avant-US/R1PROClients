@@ -181,10 +181,10 @@ def _ensure_run_py() -> bool:
         return True
 
     print("[client] run.py 未运行，正在启动...")
-    cmd = ["/home/nvidia/zwy_WS/new/r1pro_chassis/.venv/bin/python", "run.py"]
+    cmd = ["/home/nvidia/miniconda3/envs/R1PRO_WAM/bin/python", "run.py"]
     _state.run_py_proc = subprocess.Popen(
         cmd,
-        cwd="/home/nvidia/zwy_WS/new/r1pro_chassis",
+        cwd="/home/nvidia/lg_ws/Rb/R1PROClients/new/r1pro_chassis",
         env=_ROS2_ENV,
         start_new_session=True,
     )
@@ -211,7 +211,7 @@ def _kill_run_py():
         print("[client] run.py 已关闭")
 
     subprocess.run(
-        "pkill -9 -f '.venv/bin/python run.py'",
+        "pkill -9 -f '/home/nvidia/miniconda3/envs/R1PRO_WAM/bin/python run.py'",
         shell=True, timeout=5, env=_ROS2_ENV,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )

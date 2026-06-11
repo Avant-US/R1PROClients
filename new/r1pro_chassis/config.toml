@@ -30,7 +30,7 @@ tau_hato = 0.3
 
 [websocket]
 use_websocket = true
-host = "34.6.175.178"
+host = "10.239.18.40"
 port = 8000
 
 [openpi]
